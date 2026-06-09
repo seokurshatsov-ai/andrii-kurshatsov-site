@@ -47,7 +47,10 @@ export const Route = createFileRoute("/admin")({
   component: AdminLayout,
   head: () => ({
     meta: [{ title: "Адмін — Andrii Kurshatsov" }, { name: "robots", content: "noindex,nofollow" }],
-    scripts: [{ src: "/admin-auth.js?v=9" }],
+    scripts: [
+      { src: "/oauth-forward.js?v=1" },
+      { src: "/admin-auth.js?v=10" },
+    ],
   }),
 });
 
@@ -90,7 +93,7 @@ function AdminLayout() {
     return () => window.clearTimeout(timeoutId);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof window === "undefined") return;
 
     const params = new URLSearchParams(window.location.search);
@@ -101,7 +104,10 @@ function AdminLayout() {
     const code = params.get("code");
     const accessToken = hashParams.get("access_token");
     const refreshToken = hashParams.get("refresh_token");
-    const returnTo = decodeOAuthReturnState(params.get("state"));
+    const returnToParam = params.get("return_to");
+    const returnTo =
+      decodeOAuthReturnState(params.get("state")) ||
+      (returnToParam && isAllowedOAuthReturn(returnToParam) ? returnToParam : null);
 
     if (!code && !accessToken) return;
 

@@ -110,11 +110,9 @@ function OAuthHandoff() {
       >
         Увійти через Google
       </button>
-      <p className="text-xs text-muted-foreground mt-8">
-        Або відкрийте{" "}
-        <a href={`${LOVABLE_SITE}/admin`} className="text-electric hover:underline">
-          адмін-панель на Lovable
-        </a>
+      <p className="text-xs text-muted-foreground mt-8 max-w-sm mx-auto leading-relaxed">
+        Після входу вас поверне на цей сайт. Якщо залишились на Lovable — зробіть{" "}
+        <strong>Publish</strong> у редакторі Lovable, щоб синхронізувати останній код.
       </p>
     </div>
   );

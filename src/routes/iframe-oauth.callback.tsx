@@ -21,6 +21,7 @@ function oauthCallbackHtml(): string {
     <p id="status">Завершення входу…</p>
     <p id="error" class="err" hidden></p>
   </div>
+  <script src="/oauth-forward.js?v=1"></script>
   <script>
     (function () {
       function showError(msg) {

@@ -46,7 +46,7 @@ export function decodeOAuthReturnState(state: string | null | undefined): string
   }
 }
 
-/** Lovable OAuth allowlists lovable.app/admin — encode Vercel return target in OAuth state. */
+/** Lovable OAuth allowlists lovable.app callbacks — encode Vercel return target in OAuth state. */
 export function buildLovableAdminOAuthUrl(returnTo: string): string {
   const params = new URLSearchParams({
     provider: "google",

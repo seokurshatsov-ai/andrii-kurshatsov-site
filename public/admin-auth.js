@@ -91,7 +91,54 @@
   var refreshToken =
     hashParams.get("refresh_token") || queryParams.get("refresh_token");
 
+  function decodeOAuthReturnState(state) {
+    if (!state) return null;
+    try {
+      var padded = state + "====".slice((state.length % 4) || 4);
+      var json = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+      var parsed = JSON.parse(json);
+      return typeof parsed.return_to === "string" ? parsed.return_to : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function isAllowedOAuthReturn(url) {
+    try {
+      var parsed = new URL(url);
+      if (!parsed.pathname.endsWith("/iframe-oauth/callback")) return false;
+      var allowed = [
+        "https://andrii-kurshatsov-site.vercel.app",
+        "https://andrii-kurshatsov.lovable.app",
+      ];
+      if (allowed.indexOf(parsed.origin) !== -1) return true;
+      if (
+        parsed.protocol === "http:" &&
+        ["127.0.0.1", "localhost", "[::1]"].indexOf(parsed.hostname) !== -1
+      ) {
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   if (accessToken && refreshToken) {
+    var returnTo =
+      decodeOAuthReturnState(queryParams.get("state")) ||
+      (isAllowedOAuthReturn(queryParams.get("return_to") || "")
+        ? queryParams.get("return_to")
+        : null);
+    if (returnTo) {
+      var nextHash = new URLSearchParams({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        token_type: "bearer",
+      }).toString();
+      location.replace(returnTo + "#" + nextHash);
+      return;
+    }
     redirectToSession(accessToken, refreshToken);
     return;
   }
