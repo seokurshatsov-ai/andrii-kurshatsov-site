@@ -1,23 +1,45 @@
 import { createLovableAuth } from "@lovable.dev/cloud-auth-js";
-import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 
+const LOVABLE_SITE = "https://andrii-kurshatsov.lovable.app";
 const PRODUCTION_SITE =
   import.meta.env.VITE_SITE_URL ?? "https://andrii-kurshatsov-site.vercel.app";
-const PRODUCTION_OAUTH_BROKER = "https://andrii-kurshatsov.lovable.app/~oauth/initiate";
+const PRODUCTION_OAUTH_BROKER = `${LOVABLE_SITE}/~oauth/initiate`;
 const PORT80_CALLBACK = "http://127.0.0.1/iframe-oauth/callback";
+
+export function isLocalPort80Origin(origin: string): boolean {
+  try {
+    const { protocol, hostname, port } = new URL(origin);
+    return protocol === "http:" && hostname === "127.0.0.1" && (port === "" || port === "80");
+  } catch {
+    return false;
+  }
+}
 
 /** OAuth callback for the current host (localhost:80 vs production). */
 export function resolveOAuthCallbackUri(origin: string): string {
-  try {
-    const { protocol, hostname, port } = new URL(origin);
-    if (protocol === "http:" && hostname === "127.0.0.1" && (port === "" || port === "80")) {
-      return PORT80_CALLBACK;
-    }
-  } catch {
-    // fall through
-  }
+  if (isLocalPort80Origin(origin)) return PORT80_CALLBACK;
   return `${origin}/iframe-oauth/callback`;
+}
+
+/** Lovable OAuth only allowlists lovable.app callbacks — hand off tokens to Vercel after sign-in. */
+export function buildOAuthHandoffUrl(returnToOrigin: string): string {
+  const returnTo = resolveOAuthCallbackUri(returnToOrigin);
+  return `${LOVABLE_SITE}/oauth-handoff?return_to=${encodeURIComponent(returnTo)}`;
+}
+
+export function isAllowedOAuthReturn(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.pathname.endsWith("/iframe-oauth/callback")) return false;
+    if (parsed.origin === PRODUCTION_SITE || parsed.origin === LOVABLE_SITE) return true;
+    if (parsed.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(parsed.hostname)) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 const localDevAuth = createLovableAuth({
@@ -38,13 +60,8 @@ async function finishOAuth(result: OAuthResult): Promise<{ error?: Error }> {
   return {};
 }
 
-function localOAuthCallbackUri(): string {
-  return resolveOAuthCallbackUri(window.location.origin);
-}
-
 function productionHandoffUrl(): string {
-  const returnTo = `${window.location.origin}/iframe-oauth/callback`;
-  return `${PRODUCTION_SITE}/oauth-handoff?return_to=${encodeURIComponent(returnTo)}`;
+  return buildOAuthHandoffUrl(window.location.origin);
 }
 
 export function isPort80DevServer(): boolean {
@@ -54,27 +71,22 @@ export function isPort80DevServer(): boolean {
 }
 
 export async function signInWithGoogle(): Promise<{ error?: Error }> {
-  const redirectTo = `${window.location.origin}/admin`;
-
-  if (import.meta.env.DEV) {
-    if (isPort80DevServer()) {
-      const result = await localDevAuth.signInWithOAuth("google", {
-        redirect_uri: PORT80_CALLBACK,
-      });
-      return finishOAuth(result);
-    }
-
-    window.location.href = productionHandoffUrl();
-    return {};
+  if (import.meta.env.DEV && isPort80DevServer()) {
+    const result = await localDevAuth.signInWithOAuth("google", {
+      redirect_uri: PORT80_CALLBACK,
+    });
+    return finishOAuth(result);
   }
 
-  const result = await lovable.auth.signInWithOAuth("google", {
-    redirect_uri: redirectTo,
-  });
-  if (result.error) {
-    return { error: result.error as Error };
-  }
+  // Vercel and non-:80 dev: OAuth runs on lovable.app, then tokens return to this origin.
+  window.location.href = productionHandoffUrl();
   return {};
 }
 
-export { PRODUCTION_SITE, PRODUCTION_OAUTH_BROKER, productionHandoffUrl, PORT80_CALLBACK };
+export {
+  LOVABLE_SITE,
+  PRODUCTION_SITE,
+  PRODUCTION_OAUTH_BROKER,
+  productionHandoffUrl,
+  PORT80_CALLBACK,
+};

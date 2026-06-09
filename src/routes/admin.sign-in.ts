@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequest } from "@tanstack/react-start/server";
 import {
+  buildOAuthHandoffUrl,
+  isLocalPort80Origin,
   PRODUCTION_OAUTH_BROKER,
-  resolveOAuthCallbackUri,
+  PORT80_CALLBACK,
 } from "@/lib/adminSignIn";
 
 function generateState(): string {
@@ -20,11 +22,21 @@ export const Route = createFileRoute("/admin/sign-in")({
       GET: async () => {
         const request = getRequest();
         const origin = new URL(request.url).origin;
-        const redirectUri = resolveOAuthCallbackUri(origin);
+
+        // Lovable OAuth allowlists only lovable.app + 127.0.0.1 callbacks.
+        if (!isLocalPort80Origin(origin)) {
+          return new Response(null, {
+            status: 302,
+            headers: {
+              Location: buildOAuthHandoffUrl(origin),
+              "Cache-Control": "no-store",
+            },
+          });
+        }
 
         const params = new URLSearchParams({
           provider: "google",
-          redirect_uri: redirectUri,
+          redirect_uri: PORT80_CALLBACK,
           state: generateState(),
         });
 

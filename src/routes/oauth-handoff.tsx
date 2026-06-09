@@ -4,7 +4,7 @@ import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { ADMIN_EMAIL } from "@/lib/useAuth";
 
-import { PRODUCTION_SITE } from "@/lib/adminSignIn";
+import { isAllowedOAuthReturn, PRODUCTION_SITE } from "@/lib/adminSignIn";
 
 export const Route = createFileRoute("/oauth-handoff")({
   component: OAuthHandoff,
@@ -12,16 +12,6 @@ export const Route = createFileRoute("/oauth-handoff")({
     meta: [{ title: "Передача сесії…" }, { name: "robots", content: "noindex,nofollow" }],
   }),
 });
-
-function isAllowedDevReturn(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "http:") return false;
-    return ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
-  } catch {
-    return false;
-  }
-}
 
 function OAuthHandoff() {
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +28,7 @@ function OAuthHandoff() {
       return;
     }
 
-    if (!isAllowedDevReturn(returnTo)) {
+    if (!isAllowedOAuthReturn(returnTo)) {
       setError("Недозволена адреса повернення");
       setLoading(false);
       return;
@@ -114,9 +104,9 @@ function OAuthHandoff() {
 
   return (
     <div className="pt-32 container-px mx-auto max-w-md text-center">
-      <h1 className="font-display text-3xl mb-4 text-gradient">Вхід для локальної розробки</h1>
+      <h1 className="font-display text-3xl mb-4 text-gradient">Вхід в адмін-панель</h1>
       <p className="text-muted-foreground mb-8">
-        Увійдіть через Google ({ADMIN_EMAIL}), щоб передати сесію на localhost.
+        Увійдіть через Google ({ADMIN_EMAIL}), щоб передати сесію на ваш сайт.
       </p>
       <button
         onClick={signIn}
