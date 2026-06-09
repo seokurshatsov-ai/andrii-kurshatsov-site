@@ -270,22 +270,40 @@ function Login({ checking = false }: { checking?: boolean }) {
   return (
     <div className="pt-32 container-px mx-auto max-w-md text-center" data-admin-login>
       <h1 className="font-display text-4xl mb-4 text-gradient">Адмін-панель</h1>
-      <p className="text-muted-foreground mb-8">Увійдіть через Google акаунт {ADMIN_EMAIL}</p>
+      <p className="text-muted-foreground mb-8">
+        Увійдіть через Google ({ADMIN_EMAIL}). База даних і OAuth керуються через Lovable Cloud.
+      </p>
       <a
-        href="/admin/sign-in"
+        href={`${LOVABLE_SITE}/admin`}
         className="btn-electric hover:btn-electric-hover rounded-full px-7 py-3.5 text-sm font-medium inline-block"
       >
-        {checking ? "Перевірка сесії…" : "Увійти через Google"}
+        {checking ? "Перевірка сесії…" : "Увійти через Google (Lovable)"}
       </a>
 
       {!import.meta.env.DEV && (
-        <p className="text-xs text-muted-foreground mt-6 max-w-sm mx-auto leading-relaxed">
-          Вхід проходить через Lovable OAuth і повертає вас на цей сайт. Якщо не спрацює — відкрийте{" "}
-          <a href={`${LOVABLE_SITE}/admin`} className="text-electric hover:underline">
-            адмін-панель на Lovable
-          </a>
-          .
-        </p>
+        <div className="text-xs text-muted-foreground mt-8 max-w-sm mx-auto leading-relaxed space-y-3 text-left rounded-2xl border border-border/60 bg-muted/20 p-5">
+          <p>
+            <strong className="text-foreground">Чому не Supabase Dashboard?</strong> Проєкт{" "}
+            <code className="text-xs">tftlfzeytiwpmiyvimla</code> створений через Lovable — доступ
+            до{" "}
+            <a
+              href="https://supabase.com/dashboard/project/tftlfzeytiwpmiyvimla"
+              className="text-electric hover:underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              supabase.com/dashboard
+            </a>{" "}
+            є лише у власника Lovable Cloud.
+          </p>
+          <p>
+            Публічний сайт працює на Vercel, а вхід в адмінку — на{" "}
+            <a href={`${LOVABLE_SITE}/admin`} className="text-electric hover:underline">
+              {LOVABLE_SITE}/admin
+            </a>
+            . Там Google OAuth уже налаштований.
+          </p>
+        </div>
       )}
 
       {import.meta.env.DEV && (

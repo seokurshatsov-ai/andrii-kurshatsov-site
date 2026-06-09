@@ -2,10 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { getRequest } from "@tanstack/react-start/server";
 import {
   isLocalPort80Origin,
+  LOVABLE_SITE,
   PRODUCTION_OAUTH_BROKER,
   PORT80_CALLBACK,
 } from "@/lib/adminSignIn";
-import { buildSupabaseGoogleSignInUrl } from "@/lib/supabaseGoogleSignIn";
 
 function generateState(): string {
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
@@ -39,10 +39,11 @@ export const Route = createFileRoute("/admin/sign-in")({
           });
         }
 
+        // Supabase is managed by Lovable Cloud — Google OAuth works on lovable.app/admin.
         return new Response(null, {
           status: 302,
           headers: {
-            Location: buildSupabaseGoogleSignInUrl(origin),
+            Location: `${LOVABLE_SITE}/admin`,
             "Cache-Control": "no-store",
           },
         });
