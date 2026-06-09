@@ -7,6 +7,7 @@ import {
   PRODUCTION_OAUTH_BROKER,
   PORT80_CALLBACK,
 } from "@/lib/adminSignIn";
+import { resolveSupabasePublicConfig } from "@/lib/supabaseEnv";
 
 function generateState(): string {
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
@@ -15,13 +16,6 @@ function generateState(): string {
       .join("");
   }
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
-function getSupabaseConfig() {
-  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const key =
-    process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  return url && key ? { url, key } : null;
 }
 
 export const Route = createFileRoute("/admin/sign-in")({
@@ -47,12 +41,8 @@ export const Route = createFileRoute("/admin/sign-in")({
           });
         }
 
-        const config = getSupabaseConfig();
-        if (!config) {
-          return new Response("Supabase is not configured", { status: 500 });
-        }
-
-        const supabase = createClient(config.url, config.key);
+        const { url, key } = resolveSupabasePublicConfig();
+        const supabase = createClient(url, key);
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: "google",
           options: {
