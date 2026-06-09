@@ -1,9 +1,13 @@
-import { createLovableAuth } from "@lovable.dev/cloud-auth-js";
-import { LOVABLE_OAUTH_REDIRECT_URI, PRODUCTION_OAUTH_BROKER } from "@/lib/adminSignIn";
+import {
+  encodeOAuthReturnState,
+  LOVABLE_OAUTH_REDIRECT_URI,
+  PRODUCTION_OAUTH_BROKER,
+} from "@/lib/adminSignIn";
 
 const OAUTH_MESSAGE_TYPE = "authorization_response";
 const OAUTH_ORIGINS = ["https://oauth.lovable.app", "https://lovable.dev"];
 const POPUP_CHECK_MS = 500;
+const OAUTH_TIMEOUT_MS = 120_000;
 
 function generateState(): string {
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
@@ -36,6 +40,20 @@ function processOAuthResponse(
   return { access_token: data.access_token, refresh_token: data.refresh_token };
 }
 
+function buildOAuthUrl(state: string, parentOrigin: string, webMessage = true): string {
+  const params = new URLSearchParams({
+    provider: "google",
+    redirect_uri: LOVABLE_OAUTH_REDIRECT_URI,
+    state,
+    parent_origin: parentOrigin,
+    origin: parentOrigin,
+  });
+  if (webMessage) {
+    params.set("response_mode", "web_message");
+  }
+  return `${PRODUCTION_OAUTH_BROKER}?${params.toString()}`;
+}
+
 function openOAuthPopup(url: string): Window | null {
   const width = Math.round(window.outerWidth * 0.5);
   const height = Math.round(window.outerHeight * 0.5);
@@ -48,69 +66,78 @@ function openOAuthPopup(url: string): Window | null {
   );
 }
 
-/** Popup OAuth on the top-level window (avoids sandboxed iframe breaking postMessage). */
+function waitForOAuthMessage(popup: Window): Promise<Record<string, unknown>> {
+  let removeListener: (() => void) | undefined;
+  let popupTimer: ReturnType<typeof setInterval> | undefined;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const promise = new Promise<Record<string, unknown>>((resolve, reject) => {
+    const onMessage = (event: MessageEvent) => {
+      if (!OAUTH_ORIGINS.includes(event.origin)) return;
+      const data = event.data as { type?: string; response?: Record<string, unknown> };
+      if (data?.type !== OAUTH_MESSAGE_TYPE || !data.response) return;
+      resolve(data.response);
+    };
+
+    window.addEventListener("message", onMessage);
+    removeListener = () => window.removeEventListener("message", onMessage);
+
+    popupTimer = setInterval(() => {
+      if (popup.closed) {
+        reject(new Error("Sign in was cancelled"));
+      }
+    }, POPUP_CHECK_MS);
+
+    timeoutId = setTimeout(() => {
+      reject(
+        new Error(
+          "Час очікування вичерпано. Дозвольте popup і спробуйте ще раз, або скористайтесь повним перенаправленням.",
+        ),
+      );
+    }, OAUTH_TIMEOUT_MS);
+  });
+
+  return promise.finally(() => {
+    removeListener?.();
+    if (popupTimer) clearInterval(popupTimer);
+    if (timeoutId) clearTimeout(timeoutId);
+    try {
+      popup.close();
+    } catch {
+      // ignore
+    }
+  });
+}
+
+/** Popup OAuth on the top-level window. parent_origin tells Lovable where to post tokens. */
 export async function signInWithGooglePopup(): Promise<
   { access_token: string; refresh_token: string } | { error: Error }
 > {
   const state = generateState();
-  const params = new URLSearchParams({
-    provider: "google",
-    redirect_uri: LOVABLE_OAUTH_REDIRECT_URI,
-    state,
-    response_mode: "web_message",
-  });
-  const url = `${PRODUCTION_OAUTH_BROKER}?${params.toString()}`;
+  const parentOrigin = window.location.origin;
+  const url = buildOAuthUrl(state, parentOrigin, true);
 
   const popup = openOAuthPopup(url);
   if (!popup) {
     return { error: new Error("Popup was blocked. Allow popups for this site and try again.") };
   }
 
-  let removeListener: (() => void) | undefined;
-  let popupTimer: ReturnType<typeof setInterval> | undefined;
-
   try {
-    const response = await new Promise<Record<string, unknown>>((resolve, reject) => {
-      const onMessage = (event: MessageEvent) => {
-        if (!OAUTH_ORIGINS.includes(event.origin)) return;
-        const data = event.data as { type?: string; response?: Record<string, unknown> };
-        if (data?.type !== OAUTH_MESSAGE_TYPE || !data.response) return;
-        resolve(data.response);
-      };
-
-      window.addEventListener("message", onMessage);
-      removeListener = () => window.removeEventListener("message", onMessage);
-
-      popupTimer = setInterval(() => {
-        if (popup.closed) {
-          reject(new Error("Sign in was cancelled"));
-        }
-      }, POPUP_CHECK_MS);
-    });
-
+    const response = await waitForOAuthMessage(popup);
     return processOAuthResponse(response as Parameters<typeof processOAuthResponse>[0], state);
   } catch (error) {
     return { error: error instanceof Error ? error : new Error(String(error)) };
-  } finally {
-    removeListener?.();
-    if (popupTimer) clearInterval(popupTimer);
-    popup.close();
   }
 }
 
-/** Local dev on port 80 may use the SDK redirect flow instead. */
-export async function signInWithGoogleForCurrentContext(): Promise<
-  { access_token: string; refresh_token: string } | { error: Error } | { redirected: true }
-> {
-  const auth = createLovableAuth({ oauthBrokerUrl: PRODUCTION_OAUTH_BROKER });
-  const result = await auth.signInWithOAuth("google", {
+/** Full-page redirect via Lovable (allowlisted callback). returnTo encoded in OAuth state. */
+export function redirectToLovableOAuth(returnTo: string): void {
+  const params = new URLSearchParams({
+    provider: "google",
     redirect_uri: LOVABLE_OAUTH_REDIRECT_URI,
+    state: encodeOAuthReturnState(returnTo),
+    parent_origin: window.location.origin,
+    origin: window.location.origin,
   });
-
-  if (result.redirected) return { redirected: true };
-  if (result.error) return { error: result.error };
-  if (!result.tokens?.access_token || !result.tokens?.refresh_token) {
-    return { error: new Error("No tokens received") };
-  }
-  return result.tokens;
+  window.location.href = `${PRODUCTION_OAUTH_BROKER}?${params.toString()}`;
 }
