@@ -49,7 +49,7 @@ function AdminBootScreen() {
   );
 }
 
-function isDevAdminUser(user: User | null): boolean {
+function isOwnerEmail(user: User | null): boolean {
   if (!user) return false;
   const email = user.email ?? (user.user_metadata as { email?: string } | undefined)?.email;
   return email === ADMIN_EMAIL;
@@ -137,7 +137,7 @@ function AdminLayout() {
   const effectiveUser =
     user ?? storedUser ?? loaderUser ?? (getEffectiveAdminUser() as User) ?? null;
 
-  const devAdminOk = import.meta.env.DEV && isDevAdminUser(effectiveUser);
+  const ownerOk = isOwnerEmail(effectiveUser);
 
   const signOut = async () => {
     clearAdminSession();
@@ -156,7 +156,7 @@ function AdminLayout() {
     return <Login checking={false} />;
   }
 
-  if (!isAdmin && !devAdminOk) {
+  if (!isAdmin && !ownerOk) {
     return (
       <div className="pt-32 container-px mx-auto max-w-md text-center">
         <h1 className="font-display text-3xl mb-4">Доступ заборонено</h1>

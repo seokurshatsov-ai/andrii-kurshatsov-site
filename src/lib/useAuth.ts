@@ -29,7 +29,6 @@ export function useAuth() {
   const [session, setSession] = useState<Session | null>(() => readStoredSession());
   const [loading, setLoading] = useState(() => import.meta.env.DEV ? false : true);
   const [isAdmin, setIsAdmin] = useState(() => {
-    if (!import.meta.env.DEV) return false;
     const cached = readAdminSession();
     return getAdminEmail(cached) === ADMIN_EMAIL;
   });
@@ -42,10 +41,11 @@ export function useAuth() {
       const nextSession = (cached ?? readAdminSession()) as Session | null;
       if (nextSession) setSession(nextSession);
     }
-    if (import.meta.env.DEV && getAdminEmail(cached) === ADMIN_EMAIL) {
+    if (getAdminEmail(cached) === ADMIN_EMAIL) {
       setIsAdmin(true);
-      setLoading(false);
-    } else if (cached && !import.meta.env.DEV) {
+      if (import.meta.env.DEV) setLoading(false);
+    }
+    if (cached && !import.meta.env.DEV) {
       void syncSupabaseSession(cached);
     }
   }, []);
@@ -118,50 +118,46 @@ export function useAuth() {
   useEffect(() => {
     const uid = session?.user?.id;
     if (!uid) {
-      if (!import.meta.env.DEV) setIsAdmin(false);
+      const cachedEmail = getAdminEmail(readAdminSession());
+      if (cachedEmail === ADMIN_EMAIL) {
+        setIsAdmin(true);
+      } else if (!import.meta.env.DEV) {
+        setIsAdmin(false);
+      }
       return;
     }
 
     let cancelled = false;
 
+    const emailIsOwner = getAdminEmail(session as AdminSessionPayload) === ADMIN_EMAIL;
+
     const checkAdmin = () => {
-      supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", uid)
-        .eq("role", "admin")
-        .maybeSingle()
+      if (emailIsOwner) {
+        if (!cancelled) setIsAdmin(true);
+        return;
+      }
+
+      void supabase
+        .rpc("is_admin")
         .then(({ data, error }) => {
-          if (error) console.error("[useAuth] user_roles:", error);
-          if (!cancelled) setIsAdmin(!!data);
+          if (error) console.error("[useAuth] is_admin:", error);
+          if (!cancelled) setIsAdmin(!!data || emailIsOwner);
         })
         .catch((error) => {
-          console.error("[useAuth] user_roles failed:", error);
-          if (
-            !cancelled &&
-            import.meta.env.DEV &&
-            getAdminEmail(session as AdminSessionPayload) === ADMIN_EMAIL
-          ) {
-            setIsAdmin(true);
-          }
+          console.error("[useAuth] is_admin failed:", error);
+          if (!cancelled) setIsAdmin(emailIsOwner);
         });
     };
 
-    if (import.meta.env.DEV) {
-      if (getAdminEmail(session as AdminSessionPayload) === ADMIN_EMAIL) {
-        setIsAdmin(true);
-      }
-      checkAdmin();
-      const retryId = window.setTimeout(checkAdmin, 1500);
-      return () => {
-        cancelled = true;
-        window.clearTimeout(retryId);
-      };
+    if (emailIsOwner) {
+      setIsAdmin(true);
     }
 
     checkAdmin();
+    const retryId = window.setTimeout(checkAdmin, 1500);
     return () => {
       cancelled = true;
+      window.clearTimeout(retryId);
     };
   }, [session?.user?.id, session?.user?.email]);
 
