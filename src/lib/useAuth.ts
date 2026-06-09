@@ -1,10 +1,19 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { getAdminEmail, readAdminSession, persistAdminSession, getEffectiveAdminUser, type AdminSessionPayload } from "@/lib/adminSession";
+import {
+  ADMIN_OWNER_EMAIL,
+  getAdminEmail,
+  getEffectiveAdminUser,
+  isAdminOwnerEmail,
+  persistAdminSession,
+  pickUserWithEmail,
+  readAdminSession,
+  type AdminSessionPayload,
+} from "@/lib/adminSession";
 import { syncAdminSessionToSupabaseStorage } from "@/lib/adminSupabase";
 
-const ADMIN_EMAIL = "andreswebit@gmail.com";
+const ADMIN_EMAIL = ADMIN_OWNER_EMAIL;
 
 function readStoredSession(): Session | null {
   return readAdminSession() as Session | null;
@@ -30,7 +39,7 @@ export function useAuth() {
   const [loading, setLoading] = useState(() => import.meta.env.DEV ? false : true);
   const [isAdmin, setIsAdmin] = useState(() => {
     const cached = readAdminSession();
-    return getAdminEmail(cached) === ADMIN_EMAIL;
+    return isAdminOwnerEmail(getAdminEmail(cached));
   });
 
   useLayoutEffect(() => {
@@ -41,7 +50,7 @@ export function useAuth() {
       const nextSession = (cached ?? readAdminSession()) as Session | null;
       if (nextSession) setSession(nextSession);
     }
-    if (getAdminEmail(cached) === ADMIN_EMAIL) {
+    if (isAdminOwnerEmail(getAdminEmail(cached))) {
       setIsAdmin(true);
       if (import.meta.env.DEV) setLoading(false);
     }
@@ -60,7 +69,7 @@ export function useAuth() {
     }
 
     if (import.meta.env.DEV) {
-      if (cached && getAdminEmail(cached) === ADMIN_EMAIL) {
+      if (cached && isAdminOwnerEmail(getAdminEmail(cached))) {
         setIsAdmin(true);
       }
       setLoading(false);
@@ -119,7 +128,7 @@ export function useAuth() {
     const uid = session?.user?.id;
     if (!uid) {
       const cachedEmail = getAdminEmail(readAdminSession());
-      if (cachedEmail === ADMIN_EMAIL) {
+      if (isAdminOwnerEmail(cachedEmail)) {
         setIsAdmin(true);
       } else if (!import.meta.env.DEV) {
         setIsAdmin(false);
@@ -129,7 +138,10 @@ export function useAuth() {
 
     let cancelled = false;
 
-    const emailIsOwner = getAdminEmail(session as AdminSessionPayload) === ADMIN_EMAIL;
+    const cachedEmail = getAdminEmail(readAdminSession());
+    const emailIsOwner =
+      isAdminOwnerEmail(getAdminEmail(session as AdminSessionPayload)) ||
+      isAdminOwnerEmail(cachedEmail);
 
     const checkAdmin = () => {
       if (emailIsOwner) {
@@ -161,8 +173,10 @@ export function useAuth() {
     };
   }, [session?.user?.id, session?.user?.email]);
 
-  const user: User | null =
-    session?.user ?? (getEffectiveAdminUser() as User | null) ?? null;
+  const user: User | null = pickUserWithEmail(
+    session?.user ?? null,
+    getEffectiveAdminUser() as User | null,
+  );
 
   return { session, user, isAdmin, loading };
 }

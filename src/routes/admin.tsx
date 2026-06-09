@@ -11,7 +11,12 @@ import { getAdminSessionUser } from "@/lib/admin.functions";
 import { useAuth, ADMIN_EMAIL } from "@/lib/useAuth";
 import {
   clearAdminSession,
+  getAdminEmail,
   getEffectiveAdminUser,
+  isAdminOwnerEmail,
+  pickUserWithEmail,
+  readAdminSession,
+  resolveUserEmail,
 } from "@/lib/adminSession";
 import { LogOut, LayoutGrid, FileText, Share2, User as UserIcon, Sparkles, Star, HelpCircle, Search, Route as RouteIcon } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
@@ -52,12 +57,6 @@ function AdminBootScreen() {
       Завантаження адмін-панелі…
     </div>
   );
-}
-
-function isOwnerEmail(user: User | null): boolean {
-  if (!user) return false;
-  const email = user.email ?? (user.user_metadata as { email?: string } | undefined)?.email;
-  return email === ADMIN_EMAIL;
 }
 
 declare global {
@@ -160,10 +159,18 @@ function AdminLayout() {
     void applySession();
   }, []);
 
-  const effectiveUser =
-    user ?? storedUser ?? loaderUser ?? (getEffectiveAdminUser() as User) ?? null;
+  const effectiveUser = pickUserWithEmail(
+    user,
+    storedUser,
+    loaderUser,
+    getEffectiveAdminUser() as User,
+  );
 
-  const ownerOk = isOwnerEmail(effectiveUser);
+  const ownerOk =
+    isAdminOwnerEmail(resolveUserEmail(effectiveUser)) ||
+    isAdminOwnerEmail(getAdminEmail(readAdminSession()));
+
+  const displayEmail = resolveUserEmail(effectiveUser) ?? "невідомий акаунт";
 
   const signOut = async () => {
     clearAdminSession();
@@ -187,7 +194,7 @@ function AdminLayout() {
       <div className="pt-32 container-px mx-auto max-w-md text-center">
         <h1 className="font-display text-3xl mb-4">Доступ заборонено</h1>
         <p className="text-muted-foreground mb-6">
-          Тільки {ADMIN_EMAIL} може керувати цим сайтом. Ви увійшли як {effectiveUser.email}.
+          Тільки {ADMIN_EMAIL} може керувати цим сайтом. Ви увійшли як {displayEmail}.
         </p>
         <button
           onClick={() => void signOut()}
@@ -216,7 +223,7 @@ function AdminLayout() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
           <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Адмін-панель</div>
-          <h1 className="font-display text-3xl mt-1">{effectiveUser.email}</h1>
+          <h1 className="font-display text-3xl mt-1">{displayEmail}</h1>
         </div>
         <button
           onClick={() => void signOut()}

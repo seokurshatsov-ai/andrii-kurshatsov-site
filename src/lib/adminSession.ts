@@ -1,5 +1,42 @@
 const PROJECT_REF = "tftlfzeytiwpmiyvimla";
 
+export const ADMIN_OWNER_EMAIL = "andreswebit@gmail.com";
+
+export function normalizeAdminEmail(
+  email: string | null | undefined,
+): string | undefined {
+  if (!email) return undefined;
+  const trimmed = email.trim();
+  return trimmed ? trimmed.toLowerCase() : undefined;
+}
+
+export function isAdminOwnerEmail(email: string | null | undefined): boolean {
+  return normalizeAdminEmail(email) === ADMIN_OWNER_EMAIL;
+}
+
+export function resolveUserEmail(
+  user:
+    | {
+        email?: string | null;
+        user_metadata?: Record<string, unknown>;
+      }
+    | null
+    | undefined,
+): string | undefined {
+  if (!user) return undefined;
+  const meta = user.user_metadata as { email?: string } | undefined;
+  return normalizeAdminEmail(user.email || meta?.email);
+}
+
+export function pickUserWithEmail<T extends { email?: string | null; user_metadata?: Record<string, unknown> }>(
+  ...candidates: (T | null | undefined)[]
+): T | null {
+  for (const candidate of candidates) {
+    if (candidate && resolveUserEmail(candidate)) return candidate;
+  }
+  return candidates.find((candidate): candidate is T => !!candidate) ?? null;
+}
+
 /** Separate from Supabase's key so the client cannot wipe our dev session. */
 export const ADMIN_LOCAL_STORAGE_KEY = "admin-local-session-v1";
 export const ADMIN_SESSION_STORAGE_KEY = ADMIN_LOCAL_STORAGE_KEY;
@@ -213,8 +250,5 @@ export function getEffectiveAdminUser(): AdminSessionPayload["user"] | null {
 
 export function getAdminEmail(session: AdminSessionPayload | null): string | undefined {
   if (!session?.user) return undefined;
-  return (
-    session.user.email ??
-    (session.user.user_metadata as { email?: string } | undefined)?.email
-  );
+  return resolveUserEmail(session.user);
 }
