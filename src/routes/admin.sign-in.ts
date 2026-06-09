@@ -1,13 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequest } from "@tanstack/react-start/server";
-import { createClient } from "@supabase/supabase-js";
 import {
-  getSupabaseOAuthRedirectUrl,
+  buildOAuthHandoffUrl,
   isLocalPort80Origin,
   PRODUCTION_OAUTH_BROKER,
   PORT80_CALLBACK,
 } from "@/lib/adminSignIn";
-import { resolveSupabasePublicConfig } from "@/lib/supabaseEnv";
 
 function generateState(): string {
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
@@ -41,23 +39,11 @@ export const Route = createFileRoute("/admin/sign-in")({
           });
         }
 
-        const { url, key } = resolveSupabasePublicConfig();
-        const supabase = createClient(url, key);
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: {
-            redirectTo: getSupabaseOAuthRedirectUrl(origin),
-          },
-        });
-
-        if (error || !data.url) {
-          return new Response(error?.message ?? "OAuth failed", { status: 500 });
-        }
-
+        // Google OAuth secrets live in Lovable Cloud — authenticate there, then return tokens here.
         return new Response(null, {
           status: 302,
           headers: {
-            Location: data.url,
+            Location: buildOAuthHandoffUrl(origin),
             "Cache-Control": "no-store",
           },
         });

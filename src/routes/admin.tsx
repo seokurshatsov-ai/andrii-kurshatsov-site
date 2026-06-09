@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { PRODUCTION_SITE } from "@/lib/adminSignIn";
+import { LOVABLE_SITE, PRODUCTION_SITE } from "@/lib/adminSignIn";
 import { getAdminSessionUser } from "@/lib/admin.functions";
 import { useAuth, ADMIN_EMAIL } from "@/lib/useAuth";
 import {
@@ -238,6 +238,16 @@ function Login({ checking = false }: { checking?: boolean }) {
       >
         {checking ? "Перевірка сесії…" : "Увійти через Google"}
       </a>
+
+      {!import.meta.env.DEV && (
+        <p className="text-xs text-muted-foreground mt-6 max-w-sm mx-auto leading-relaxed">
+          Вхід проходить через Lovable OAuth і повертає вас на цей сайт. Якщо не спрацює — відкрийте{" "}
+          <a href={`${LOVABLE_SITE}/admin`} className="text-electric hover:underline">
+            адмін-панель на Lovable
+          </a>
+          .
+        </p>
+      )}
 
       {import.meta.env.DEV && (
         <div className="mt-10 rounded-2xl border border-border/60 bg-muted/20 p-5 text-left text-sm text-muted-foreground space-y-3">

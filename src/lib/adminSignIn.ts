@@ -70,19 +70,6 @@ export function isPort80DevServer(): boolean {
   return protocol === "http:" && hostname === "127.0.0.1" && (port === "" || port === "80");
 }
 
-async function signInWithSupabaseGoogle(redirectTo: string): Promise<{ error?: Error }> {
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo },
-  });
-  if (error) return { error };
-  if (data?.url) {
-    window.location.href = data.url;
-    return {};
-  }
-  return { error: new Error("Не вдалося розпочати OAuth") };
-}
-
 export async function signInWithGoogle(): Promise<{ error?: Error }> {
   if (import.meta.env.DEV && isPort80DevServer()) {
     const result = await localDevAuth.signInWithOAuth("google", {
@@ -91,16 +78,8 @@ export async function signInWithGoogle(): Promise<{ error?: Error }> {
     return finishOAuth(result);
   }
 
-  if (import.meta.env.DEV) {
-    window.location.href = productionHandoffUrl();
-    return {};
-  }
-
-  return signInWithSupabaseGoogle(`${window.location.origin}/admin`);
-}
-
-export function getSupabaseOAuthRedirectUrl(origin: string): string {
-  return `${origin}/admin`;
+  window.location.href = productionHandoffUrl();
+  return {};
 }
 
 export {
