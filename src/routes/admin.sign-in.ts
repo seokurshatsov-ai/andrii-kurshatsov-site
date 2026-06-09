@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-
-const PRODUCTION_OAUTH_BROKER =
-  "https://andrii-kurshatsov.lovable.app/~oauth/initiate";
-const PORT80_CALLBACK = "http://127.0.0.1/iframe-oauth/callback";
+import { getRequest } from "@tanstack/react-start/server";
+import {
+  PRODUCTION_OAUTH_BROKER,
+  resolveOAuthCallbackUri,
+} from "@/lib/adminSignIn";
 
 function generateState(): string {
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
@@ -17,9 +18,13 @@ export const Route = createFileRoute("/admin/sign-in")({
   server: {
     handlers: {
       GET: async () => {
+        const request = getRequest();
+        const origin = new URL(request.url).origin;
+        const redirectUri = resolveOAuthCallbackUri(origin);
+
         const params = new URLSearchParams({
           provider: "google",
-          redirect_uri: PORT80_CALLBACK,
+          redirect_uri: redirectUri,
           state: generateState(),
         });
 

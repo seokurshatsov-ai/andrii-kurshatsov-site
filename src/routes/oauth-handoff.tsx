@@ -4,7 +4,7 @@ import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { ADMIN_EMAIL } from "@/lib/useAuth";
 
-const PRODUCTION_SITE = "https://andrii-kurshatsov.lovable.app";
+import { PRODUCTION_SITE } from "@/lib/adminSignIn";
 
 export const Route = createFileRoute("/oauth-handoff")({
   component: OAuthHandoff,

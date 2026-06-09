@@ -2,9 +2,23 @@ import { createLovableAuth } from "@lovable.dev/cloud-auth-js";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 
-const PRODUCTION_SITE = "https://andrii-kurshatsov.lovable.app";
-const PRODUCTION_OAUTH_BROKER = `${PRODUCTION_SITE}/~oauth/initiate`;
+const PRODUCTION_SITE =
+  import.meta.env.VITE_SITE_URL ?? "https://andrii-kurshatsov-site.vercel.app";
+const PRODUCTION_OAUTH_BROKER = "https://andrii-kurshatsov.lovable.app/~oauth/initiate";
 const PORT80_CALLBACK = "http://127.0.0.1/iframe-oauth/callback";
+
+/** OAuth callback for the current host (localhost:80 vs production). */
+export function resolveOAuthCallbackUri(origin: string): string {
+  try {
+    const { protocol, hostname, port } = new URL(origin);
+    if (protocol === "http:" && hostname === "127.0.0.1" && (port === "" || port === "80")) {
+      return PORT80_CALLBACK;
+    }
+  } catch {
+    // fall through
+  }
+  return `${origin}/iframe-oauth/callback`;
+}
 
 const localDevAuth = createLovableAuth({
   oauthBrokerUrl: PRODUCTION_OAUTH_BROKER,
@@ -25,14 +39,7 @@ async function finishOAuth(result: OAuthResult): Promise<{ error?: Error }> {
 }
 
 function localOAuthCallbackUri(): string {
-  const { protocol, hostname, port } = window.location;
-
-  // Lovable allowlists exactly http://127.0.0.1/iframe-oauth/callback (port 80).
-  if (protocol === "http:" && hostname === "127.0.0.1" && (port === "" || port === "80")) {
-    return PORT80_CALLBACK;
-  }
-
-  return `${window.location.origin}/iframe-oauth/callback`;
+  return resolveOAuthCallbackUri(window.location.origin);
 }
 
 function productionHandoffUrl(): string {
@@ -70,4 +77,4 @@ export async function signInWithGoogle(): Promise<{ error?: Error }> {
   return {};
 }
 
-export { PRODUCTION_SITE, productionHandoffUrl, PORT80_CALLBACK };
+export { PRODUCTION_SITE, PRODUCTION_OAUTH_BROKER, productionHandoffUrl, PORT80_CALLBACK };
