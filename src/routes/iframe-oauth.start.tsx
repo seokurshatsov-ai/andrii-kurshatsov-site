@@ -2,11 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { createLovableAuth } from "@lovable.dev/cloud-auth-js";
 import {
-  isAllowedOAuthReturn,
   isPort80DevServer,
+  LOVABLE_OAUTH_REDIRECT_URI,
   PORT80_CALLBACK,
   PRODUCTION_OAUTH_BROKER,
-  resolveOAuthCallbackUri,
 } from "@/lib/adminSignIn";
 
 const localDevAuth = createLovableAuth({
@@ -18,10 +17,9 @@ export const Route = createFileRoute("/iframe-oauth/start")({
   component: OAuthStartFrame,
 });
 
-function resolveRedirectUri(returnTo: string | null): string {
+function resolveRedirectUri(): string {
   if (isPort80DevServer()) return PORT80_CALLBACK;
-  if (returnTo && isAllowedOAuthReturn(returnTo)) return returnTo;
-  return resolveOAuthCallbackUri(window.location.origin);
+  return LOVABLE_OAUTH_REDIRECT_URI;
 }
 
 function OAuthStartFrame() {
@@ -55,7 +53,7 @@ function OAuthStartFrame() {
     setStatus("Відкриваємо Google…");
 
     try {
-      const redirectUri = resolveRedirectUri(returnTo);
+      const redirectUri = resolveRedirectUri();
       const result = await localDevAuth.signInWithOAuth("google", {
         redirect_uri: redirectUri,
       });

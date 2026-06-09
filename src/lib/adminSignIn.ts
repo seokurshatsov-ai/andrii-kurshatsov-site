@@ -6,6 +6,8 @@ const PRODUCTION_SITE =
   import.meta.env.VITE_SITE_URL ?? "https://andrii-kurshatsov-site.vercel.app";
 const PRODUCTION_OAUTH_BROKER = `${LOVABLE_SITE}/~oauth/initiate`;
 const PORT80_CALLBACK = "http://127.0.0.1/iframe-oauth/callback";
+/** Only Lovable-hosted paths are allowlisted by oauth.lovable.app. */
+const LOVABLE_OAUTH_REDIRECT_URI = `${LOVABLE_SITE}/admin`;
 
 export function isLocalPort80Origin(origin: string): boolean {
   try {
@@ -50,7 +52,7 @@ export function decodeOAuthReturnState(state: string | null | undefined): string
 export function buildLovableAdminOAuthUrl(returnTo: string): string {
   const params = new URLSearchParams({
     provider: "google",
-    redirect_uri: `${LOVABLE_SITE}/admin`,
+    redirect_uri: LOVABLE_OAUTH_REDIRECT_URI,
     state: encodeOAuthReturnState(returnTo),
   });
   return `${PRODUCTION_OAUTH_BROKER}?${params.toString()}`;
@@ -112,6 +114,7 @@ export async function signInWithGoogle(): Promise<{ error?: Error }> {
 
 export {
   LOVABLE_SITE,
+  LOVABLE_OAUTH_REDIRECT_URI,
   PRODUCTION_SITE,
   PRODUCTION_OAUTH_BROKER,
   productionHandoffUrl,
