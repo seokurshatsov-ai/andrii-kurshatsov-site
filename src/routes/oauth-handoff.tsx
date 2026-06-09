@@ -1,10 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { ADMIN_EMAIL } from "@/lib/useAuth";
-
-import { isAllowedOAuthReturn, PRODUCTION_SITE } from "@/lib/adminSignIn";
+import {
+  buildLovableAdminOAuthUrl,
+  isAllowedOAuthReturn,
+  LOVABLE_SITE,
+  PRODUCTION_SITE,
+} from "@/lib/adminSignIn";
 
 export const Route = createFileRoute("/oauth-handoff")({
   component: OAuthHandoff,
@@ -67,16 +70,9 @@ function OAuthHandoff() {
     };
   }, [returnTo]);
 
-  const signIn = async () => {
+  const signIn = () => {
     if (!returnTo) return;
-
-    const handoffUrl = `${window.location.origin}/oauth-handoff?return_to=${encodeURIComponent(returnTo)}`;
-    const res = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: handoffUrl,
-    });
-    if (res.error) {
-      setError((res.error as Error).message);
-    }
+    window.location.href = buildLovableAdminOAuthUrl(returnTo);
   };
 
   if (error) {
@@ -116,8 +112,8 @@ function OAuthHandoff() {
       </button>
       <p className="text-xs text-muted-foreground mt-8">
         Або відкрийте{" "}
-        <a href={`${PRODUCTION_SITE}/admin`} className="text-electric hover:underline">
-          адмін-панель на production
+        <a href={`${LOVABLE_SITE}/admin`} className="text-electric hover:underline">
+          адмін-панель на Lovable
         </a>
       </p>
     </div>

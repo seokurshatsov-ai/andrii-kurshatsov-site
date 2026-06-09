@@ -1,7 +1,12 @@
 import { createFileRoute, Outlet, Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { LOVABLE_SITE, PRODUCTION_SITE } from "@/lib/adminSignIn";
+import {
+  decodeOAuthReturnState,
+  isAllowedOAuthReturn,
+  LOVABLE_SITE,
+  PRODUCTION_SITE,
+} from "@/lib/adminSignIn";
 import { getAdminSessionUser } from "@/lib/admin.functions";
 import { useAuth, ADMIN_EMAIL } from "@/lib/useAuth";
 import {
@@ -97,13 +102,27 @@ function AdminLayout() {
     const code = params.get("code");
     const accessToken = hashParams.get("access_token");
     const refreshToken = hashParams.get("refresh_token");
+    const returnTo = decodeOAuthReturnState(params.get("state"));
 
     if (!code && !accessToken) return;
 
     const finish = () => window.history.replaceState({}, "", "/admin");
 
+    const forwardReturn = (access: string, refresh: string) => {
+      if (!returnTo || !isAllowedOAuthReturn(returnTo)) return false;
+      const nextHash = new URLSearchParams({
+        access_token: access,
+        refresh_token: refresh,
+        token_type: "bearer",
+      }).toString();
+      window.location.replace(`${returnTo}#${nextHash}`);
+      return true;
+    };
+
     const applySession = async () => {
       if (accessToken && refreshToken) {
+        if (forwardReturn(accessToken, refreshToken)) return;
+
         if (import.meta.env.DEV) {
           const next = new URL("/admin/session", window.location.origin);
           next.searchParams.set("access_token", accessToken);
@@ -122,8 +141,15 @@ function AdminLayout() {
       }
 
       if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) console.error(error);
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error(error);
+          finish();
+          return;
+        }
+        if (data.session && forwardReturn(data.session.access_token, data.session.refresh_token)) {
+          return;
+        }
         finish();
         return;
       }

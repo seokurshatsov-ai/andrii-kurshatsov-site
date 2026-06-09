@@ -22,10 +22,38 @@ export function resolveOAuthCallbackUri(origin: string): string {
   return `${origin}/iframe-oauth/callback`;
 }
 
-/** Lovable OAuth only allowlists lovable.app callbacks — hand off tokens to Vercel after sign-in. */
+/** Start OAuth on the same origin (Vercel/local), then return via lovable.app/admin callback. */
 export function buildOAuthHandoffUrl(returnToOrigin: string): string {
   const returnTo = resolveOAuthCallbackUri(returnToOrigin);
-  return `${LOVABLE_SITE}/oauth-handoff?return_to=${encodeURIComponent(returnTo)}`;
+  return `${returnToOrigin}/oauth-handoff?return_to=${encodeURIComponent(returnTo)}`;
+}
+
+export function encodeOAuthReturnState(returnTo: string): string {
+  const json = JSON.stringify({ return_to: returnTo });
+  return btoa(json).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+export function decodeOAuthReturnState(state: string | null | undefined): string | null {
+  if (!state) return null;
+  try {
+    const padded = state + "=".repeat((4 - (state.length % 4)) % 4);
+    const parsed = JSON.parse(atob(padded.replace(/-/g, "+").replace(/_/g, "/"))) as {
+      return_to?: string;
+    };
+    return typeof parsed.return_to === "string" ? parsed.return_to : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Lovable OAuth allowlists lovable.app/admin — encode Vercel return target in OAuth state. */
+export function buildLovableAdminOAuthUrl(returnTo: string): string {
+  const params = new URLSearchParams({
+    provider: "google",
+    redirect_uri: `${LOVABLE_SITE}/admin`,
+    state: encodeOAuthReturnState(returnTo),
+  });
+  return `${PRODUCTION_OAUTH_BROKER}?${params.toString()}`;
 }
 
 export function isAllowedOAuthReturn(url: string): boolean {
