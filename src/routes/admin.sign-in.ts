@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequest } from "@tanstack/react-start/server";
 import {
-  buildOAuthHandoffUrl,
   isLocalPort80Origin,
   PRODUCTION_OAUTH_BROKER,
   PORT80_CALLBACK,
 } from "@/lib/adminSignIn";
+import { buildSupabaseGoogleSignInUrl } from "@/lib/supabaseGoogleSignIn";
 
 function generateState(): string {
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
@@ -39,11 +39,10 @@ export const Route = createFileRoute("/admin/sign-in")({
           });
         }
 
-        // Google OAuth secrets live in Lovable Cloud — authenticate there, then return tokens here.
         return new Response(null, {
           status: 302,
           headers: {
-            Location: buildOAuthHandoffUrl(origin),
+            Location: buildSupabaseGoogleSignInUrl(origin),
             "Cache-Control": "no-store",
           },
         });
