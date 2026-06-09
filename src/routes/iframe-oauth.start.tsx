@@ -1,10 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { createLovableAuth } from "@lovable.dev/cloud-auth-js";
-import { PORT80_CALLBACK } from "@/lib/adminSignIn";
-
-const PRODUCTION_OAUTH_BROKER =
-  "https://andrii-kurshatsov.lovable.app/~oauth/initiate";
+import {
+  isAllowedOAuthReturn,
+  isPort80DevServer,
+  PORT80_CALLBACK,
+  PRODUCTION_OAUTH_BROKER,
+  resolveOAuthCallbackUri,
+} from "@/lib/adminSignIn";
 
 const localDevAuth = createLovableAuth({
   oauthBrokerUrl: PRODUCTION_OAUTH_BROKER,
@@ -15,9 +18,18 @@ export const Route = createFileRoute("/iframe-oauth/start")({
   component: OAuthStartFrame,
 });
 
+function resolveRedirectUri(returnTo: string | null): string {
+  if (isPort80DevServer()) return PORT80_CALLBACK;
+  if (returnTo && isAllowedOAuthReturn(returnTo)) return returnTo;
+  return resolveOAuthCallbackUri(window.location.origin);
+}
+
 function OAuthStartFrame() {
   const [status, setStatus] = useState("Готово до OAuth…");
   const busy = useRef(false);
+  const returnTo = new URLSearchParams(
+    typeof window !== "undefined" ? window.location.search : "",
+  ).get("return_to");
 
   useEffect(() => {
     const inIframe = window.self !== window.top;
@@ -32,12 +44,10 @@ function OAuthStartFrame() {
 
     if (inIframe) {
       window.parent.postMessage({ type: "admin-oauth-ready" }, window.location.origin);
-    } else {
-      void runOAuth(false);
     }
 
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [returnTo]);
 
   const runOAuth = async (inIframe: boolean) => {
     if (busy.current) return;
@@ -45,8 +55,9 @@ function OAuthStartFrame() {
     setStatus("Відкриваємо Google…");
 
     try {
+      const redirectUri = resolveRedirectUri(returnTo);
       const result = await localDevAuth.signInWithOAuth("google", {
-        redirect_uri: PORT80_CALLBACK,
+        redirect_uri: redirectUri,
       });
 
       if (result.redirected) {
@@ -80,10 +91,6 @@ function OAuthStartFrame() {
         return;
       }
 
-      const next = new URL("/admin/session", window.location.origin);
-      next.searchParams.set("access_token", tokens.access_token);
-      next.searchParams.set("refresh_token", tokens.refresh_token);
-
       if (inIframe) {
         window.parent.postMessage(
           {
@@ -93,9 +100,14 @@ function OAuthStartFrame() {
           },
           window.location.origin,
         );
-      } else {
-        window.location.replace(next.toString());
+        setStatus("Сесію передано…");
+        return;
       }
+
+      const next = new URL("/admin/session", window.location.origin);
+      next.searchParams.set("access_token", tokens.access_token);
+      next.searchParams.set("refresh_token", tokens.refresh_token);
+      window.location.replace(next.toString());
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setStatus(message);
